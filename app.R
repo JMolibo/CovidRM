@@ -384,8 +384,8 @@ server <- function(input, output, session) {
     }
     
     for(i in 1:length(fecha_actual_vec)){
-      covidsum2 <- covid %>% 
-        filter(fecdx > fecha_actual_vec[i] - as.numeric(input$periodo2) & fecdx <= fecha_actual_vec[i]) %>% 
+      index <- covid$fecdx > fecha_actual_vec[i] - as.numeric(input$periodo2) & covid$fecdx <= fecha_actual_vec[i]
+      covidsum2 <- covid[index, ] %>% 
         group_by(codmunicipio_asig) %>% 
         summarize(ncasos = n())
       
