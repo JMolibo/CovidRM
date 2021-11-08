@@ -1,0 +1,11 @@
+name: covidrm
+title:
+username:
+account: jhumbertogomez
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 4626730
+bundleId: 5226412
+url: https://jhumbertogomez.shinyapps.io/covidrm/
+when: 1636359563.32398
+lastSyncTime: 1636359563.32399
