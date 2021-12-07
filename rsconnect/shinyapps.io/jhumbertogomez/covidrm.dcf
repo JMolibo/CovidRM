@@ -5,7 +5,7 @@ account: jhumbertogomez
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 4626730
-bundleId: 5226412
+bundleId: 5338660
 url: https://jhumbertogomez.shinyapps.io/covidrm/
-when: 1636359563.32398
-lastSyncTime: 1636359563.32399
+when: 1638869217.07445
+lastSyncTime: 1638869217.07446

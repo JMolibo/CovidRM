@@ -91,6 +91,7 @@ ui <- fluidPage(
                                   fluidRow(column(12, div(selectInput("ventana", 
                                                                       "Serie", 
                                                                       choices = c('Desde 01/07/2020', 
+                                                                                  'Desde 20/06/2021',
                                                                                   'Últimos 120 días', 
                                                                                   'Últimos 60 días',
                                                                                   'Últimos 28 días')),
@@ -109,7 +110,7 @@ ui <- fluidPage(
                                   %>% withSpinner(color="#9c1f2e", type = 8)
                                 )
                               )),
-                     tabPanel("Mapa municipios", fluid = TRUE, 
+                     tabPanel("Mapa riesgo: municipios", fluid = TRUE, 
                               sidebarLayout(
                                 sidebarPanel(
                                   titlePanel(h4(paste0("IA a ", format(fecha_actual, "%d/%m/%Y")))), 
@@ -186,7 +187,7 @@ ui <- fluidPage(
                                     withSpinner(color="#9c1f2e", type = 8)
                                 )
                               )), 
-                     tabPanel("Mapa ZBS por área de salud", fluid = TRUE, 
+                     tabPanel("Mapa riesgo: ZBS por área de salud", fluid = TRUE, 
                               sidebarLayout(
                                 sidebarPanel(
                                   titlePanel(h4(paste0("IA a ", format(fecha_actual, "%d/%m/%Y")))), 
@@ -215,7 +216,7 @@ ui <- fluidPage(
                                       style = 'font-size:9px')
                                 )
                               )), 
-                     tabPanel("Mapa ZBS grandes municipios", fluid = TRUE, 
+                     tabPanel("Mapa riesgo: ZBS grandes municipios", fluid = TRUE, 
                               sidebarLayout(
                                 sidebarPanel(
                                   titlePanel(h4(paste0("IA a ", format(fecha_actual, "%d/%m/%Y")))), 
@@ -260,12 +261,13 @@ ui <- fluidPage(
                                   fluidRow(column(8, div(selectInput("grupo_edad",
                                                                      "Categorias de edad",
                                                                      choices = list(`Categorías 1` = 1, `Categorías 2` = 2), 
-                                                                     ),
-                                                         style = "font-size:90%"))
+                                  ),
+                                  style = "font-size:90%"))
                                   ),
                                   fluidRow(column(12, div(selectInput("ventana3", 
                                                                       "Serie", 
                                                                       choices = c('Desde 01/07/2020', 
+                                                                                  'Desde 20/06/2021',
                                                                                   'Últimos 120 días',
                                                                                   'Últimos 60 días',
                                                                                   'Últimos 30 días')), 
@@ -311,12 +313,35 @@ ui <- fluidPage(
           
   )
 )
+# 
+input <- list()
+input$periodo <- input$periodo1 <- input$periodo2 <- input$periodo3 <- input$periodo4 <- input$periodo5 <- input$periodo6 <- input$periodo7 <- '14 días'
+input$ventana <- input$ventana1 <- input$ventana2 <- input$ventana3 <- input$ventana4 <- fecha_actual
+input$ordena <- input$ordena1 <- input$ordena2 <- FALSE
+input$codmunicipio <- '30002'
 
-# input <- list()
-# input$periodo <- input$periodo1 <- input$periodo2 <- input$periodo3 <- input$periodo4 <- input$periodo5 <- input$periodo6 <- input$periodo7 <- '14 días'
-# input$ventana <- input$ventana1 <- input$ventana2 <- input$ventana3 <- input$ventana4 <- fecha_actual
-# input$ordena <- input$ordena1 <- input$ordena2 <- FALSE
-# input$codmunicipio <- '30002'
+cambia_etiq <- function(x, puntos, periodo){
+  if(periodo == '14 días'){
+    x <- cut(x, breaks = puntos, 
+             include.lowest = TRUE, right = FALSE, 
+             labels = c('(<i>Nivel alerta</i> 1)', 
+                        '(<i>Nivel alerta</i> 1)', 
+                        '(<i>Nivel alerta</i> 2)', 
+                        '(<i>Nivel alerta</i> 3)', 
+                        '(<i>Nivel alerta</i> 4)'))
+  }else{
+    x <- cut(x, breaks = puntos, 
+             include.lowest = TRUE, right = FALSE, 
+             labels = c('(<i>Nivel alerta</i> 1)', 
+                        '(<i>Nivel alerta</i> 1)', 
+                        '(<i>Nivel alerta</i> 2)', 
+                        '(<i>Nivel alerta</i> 3)', 
+                        '(<i>Nivel alerta</i> 4)'))
+  }
+  x
+}
+
+
 
 server <- function(input, output, session) {
   
@@ -368,6 +393,8 @@ server <- function(input, output, session) {
     switch (input$ventana,
             'Desde 01/07/2020' = df <- df_m %>% 
               filter(edad == 'Todos' & periodo == input$periodo2), 
+            'Desde 20/06/2021' = df <- df_m %>% 
+              filter(fecha >= '2021-06-20' & edad == 'Todos' & periodo == input$periodo2),
             'Últimos 120 días' = df <- df_m %>% 
               filter(fecha >= (fecha_actual - 120) & edad == 'Todos' & periodo == input$periodo2),
             'Últimos 60 días' = df <- df_m %>% 
@@ -421,14 +448,24 @@ server <- function(input, output, session) {
   # Generación de los datos
   
   covidmapmun <- reactive({
+    # df_m <- df_m %>% 
+    #   left_join(pcrs_mun, 
+    #             by = 'codmunicipio')
     cov_mun <- df_m %>% 
       filter(periodo == input$periodo3 & fecha == fecha_actual & edad == 'Todos' & municipio != 'R. de Murcia')
     
+    cov_mun2 <- df_m %>% 
+      filter(periodo == input$periodo3 & fecha == fecha_actual & edad == '\u2265 65 a' & municipio != 'R. de Murcia')
+    
     municipiossph@data <- municipiossph@data %>% 
       left_join(cov_mun %>% 
-                  select(codmunicipio, ncasos, ia), 
+                  select(codmunicipio, ncasos, ia, n_alerta), 
                 by = c('codmncp' = 'codmunicipio'))
     municipiossph@data <- municipiossph@data %>% 
+      left_join(cov_mun2 %>% 
+                  select(codmunicipio, ncasos_65 = ncasos, ia_65 = ia), 
+                by = c('codmncp' = 'codmunicipio'))
+    municipiossph@data <- municipiossph@data %>%
       left_join(pcrs_mun, by = c('codmncp' = 'codmunicipio'))
     municipiossph
   })
@@ -436,33 +473,105 @@ server <- function(input, output, session) {
   # Mapa municipios
   
   output$mapmun <- renderLeaflet({
-    pal <- colorNumeric(palette = "YlOrRd", domain = covidmapmun()$ia)
-    labels <- sprintf("<b, font-size = 28px> %s </b></br> Nº casos: %s </br> IA: %s </br> Porcentaje PDIA positivas: %s 
-                  </br> Porcentaje PDIA positivas regional: %s", 
-                      covidmapmun()$municip, 
-                      covidmapmun()$ncasos, 
-                      format(covidmapmun()$ia, digits = 3, nsmall = 2), 
-                      format(covidmapmun()$porc_positivos, digits = 2, nsmall = 1), 
-                      format(covidmapmun()$porc_regional, digits = 2, nsmall = 1 )) %>% 
+    
+    covidmmun <- covidmapmun()
+    
+    if (input$periodo3 == '14 días'){
+      puntos <-  c(-Inf, 50, 100, 300, 500, Inf)
+      puntos65 <- c(-Inf, 25, 50, 150, 250, Inf)
+      covidmmun$ia_cat <- cut(covidmmun$ia, breaks = puntos,
+                              include.lowest = TRUE, right = FALSE,
+                              labels = c('Bajo control (\u2264 50)',
+                                         'Riesgo bajo [50 - 100)',
+                                         'Riesgo moderado [100 - 300)',
+                                         'Riesgo alto [300 - 500)',
+                                         'Riesgo muy alto (\u2265 500)'))
+      
+      covidmmun$ia_cat65 <- cut(covidmmun$ia_65, breaks = puntos65,
+                                include.lowest = TRUE, right = FALSE,
+                                labels = c('Bajo control (\u2264 25)',
+                                           'Riesgo bajo [25 - 50)',
+                                           'Riesgo moderado [50 - 150)',
+                                           'Riesgo alto [150 - 250)',
+                                           'Riesgo muy alto (\u2265 250)'))
+      dominio <- cut(0:550, breaks = puntos,
+                     include.lowest = TRUE, right = FALSE,
+                     labels = c('Bajo control (\u2264 50)',
+                                'Riesgo bajo [50 - 100)',
+                                'Riesgo moderado [100 - 300)',
+                                'Riesgo alto [300 - 500)',
+                                'Riesgo muy alto (\u2265 500)'))
+    }else{
+      puntos <-  c(-Inf, 25, 50, 150, 250, Inf)
+      puntos65 <- c(-Inf, 10, 25, 75, 125, Inf)
+      covidmmun$ia_cat <- cut(covidmmun$ia, breaks = puntos,
+                              include.lowest = TRUE, right = FALSE,
+                              labels = c('Bajo control (\u2264 25)',
+                                         'Riesgo bajo [25 - 50)',
+                                         'Riesgo moderado [50 - 150)',
+                                         'Riesgo alto [150 - 250)',
+                                         'Riesgo muy alto (\u2265 250)'))
+      
+      covidmmun$ia_cat65 <- cut(covidmmun$ia_65, breaks = puntos,
+                                include.lowest = TRUE, right = FALSE,
+                                labels = c('Bajo control (\u2264 10)',
+                                           'Riesgo bajo [10 - 25)',
+                                           'Riesgo moderado [25 - 75)',
+                                           'Riesgo alto [75 - 125)',
+                                           'Riesgo muy alto (\u2265 125)'))
+      
+      dominio <- cut(0:275, breaks = puntos,
+                     include.lowest = TRUE, right = FALSE,
+                     labels = c('Bajo control (\u2264 25)',
+                                'Riesgo bajo [25 - 50)',
+                                'Riesgo moderado [50 - 150)',
+                                'Riesgo alto [150 - 250)',
+                                'Riesgo muy alto (\u2265 250)'))
+    }
+    
+    covidmmun@data <- covidmmun@data %>%
+      mutate(porc_pos_cat = cut(porc_positivos,
+                                breaks = c(-Inf, 4, 7, 10, 15, Inf),
+                                include.lowest = TRUE,
+                                right = FALSE,
+                                labels = c('Bajo control',
+                                           'Riesgo bajo',
+                                           'Riesgo moderado',
+                                           'Riesgo alto',
+                                           'Riesgo muy alto')))
+
+    
+    pal <- colorFactor(palette = c("#FFFFB2", "#FECC5C", "#FD8D3C", "#F03B20", "#BD0026"), domain = covidmmun$ia_cat, 
+                       na.color = "#800026")
+    
+    labels <- sprintf("<b, font-size = 28px> %s </b></br> Nº casos: %s </br> IA: %s </br> IA &ge; 65 años: %s </br> %% PDIA positivas local: %s 
+                  </br> %% PDIA positivas regional: %s </br> Nivel de alerta: %s", 
+                      covidmmun$municip, 
+                      covidmmun$ncasos, 
+                      paste(format(covidmmun$ia, digits = 3, nsmall = 2), covidmmun$ia_cat, sep = '  '), 
+                      paste(format(covidmmun$ia_65, digits = 3, nsmall = 2), covidmmun$ia_cat65, sep = '  '), 
+                      format(covidmmun$porc_positivos, digits = 2, nsmall = 1), 
+                      format(covidmmun$porc_regional, digits = 2, nsmall = 1 ), 
+                      covidmmun$n_alerta) %>% 
       lapply(htmltools::HTML)
     # labels <- sprintf("<b> %s </b></br> Nº casos: %s </br> IA: %s", 
-    #                   covidmapmun()$municip, covidmapmun()$ncasos, format(covidmapmun()$ia, digits = 3, nsmall = 2)) %>% 
+    #                   covidmmun$municip, covidmmun$ncasos, format(covidmmun$ia, digits = 3, nsmall = 2)) %>% 
     #   lapply(htmltools::HTML)
     
-    l <- leaflet(covidmapmun())
-    l <- l %>% addPolygons(color = "gray", weight = 1, fillColor = ~ pal(ia), fillOpacity = 1,
-                           highlightOptions = highlightOptions(color = "white",weight = 1, bringToFront = TRUE),
+    l <- leaflet(covidmmun)
+    l <- l %>% addPolygons(color = "gray", weight = 1, fillColor = ~ pal(ia_cat), fillOpacity = 1,
+                           highlightOptions = highlightOptions(color = "white", weight = 1, bringToFront = TRUE),
                            label = labels,
                            labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "2px 6px"),
                                                        textsize = "12px",
                                                        direction = "auto",
                                                        opacity = 0.7)) %>%
       addLegend(pal = pal, 
-                values = ~ ia, 
+                values = ~ dominio, 
                 opacity = 0.5, 
                 title = HTML(paste0("<b style = font-size:14px>", paste0("IA ", input$periodo3, " días previos"), "</b>")), 
                 position = "topright",
-                bins = 10,
+                # bins = 10,
                 labFormat = labelFormat(digits = 2)) 
     
   })
@@ -583,19 +692,57 @@ server <- function(input, output, session) {
   output$mapzbsarea <- renderLeaflet({
     mapzb <- covidmapazb()
     
-    pal <- colorNumeric(palette = "YlOrRd", domain = mapzb$ia)
+    if (input$periodo6 == '14 días'){
+      puntos <-  c(-Inf, 50, 100, 300, 500, Inf)
+      mapzb$ia_cat <- cut(mapzb$ia, breaks = puntos, 
+                          include.lowest = TRUE, right = FALSE, 
+                          labels = c('Bajo control (\u2264 50)', 
+                                     'Riesgo bajo [50 - 100)', 
+                                     'Riesgo moderado [100 - 300)', 
+                                     'Riesgo alto [300 - 500)', 
+                                     'Riesgo muy alto (\u2265 500)'))
+      dominio <- cut(0:550, breaks = puntos, 
+                     include.lowest = TRUE, right = FALSE, 
+                     labels = c('Bajo control (\u2264 50)', 
+                                'Riesgo bajo [50 - 100)', 
+                                'Riesgo moderado [100 - 300)', 
+                                'Riesgo alto [300 - 500)', 
+                                'Riesgo muy alto (\u2265 500)'))
+    }else{
+      puntos <-  c(-Inf, 25, 50, 150, 250, Inf)
+      mapzb$ia_cat <- cut(mapzb$ia, breaks = puntos, 
+                          include.lowest = TRUE, right = FALSE, 
+                          labels = c('Bajo control (\u2264 25)', 
+                                     'Riesgo bajo [25 - 50)', 
+                                     'Riesgo moderado [50 - 150)', 
+                                     'Riesgo alto [150 - 250)', 
+                                     'Riesgo muy alto (\u2265 250)'))
+      dominio <- cut(0:275, breaks = puntos, 
+                     include.lowest = TRUE, right = FALSE, 
+                     labels = c('Bajo control (\u2264 25)', 
+                                'Riesgo bajo [25 - 50)', 
+                                'Riesgo moderado [50 - 150)', 
+                                'Riesgo alto [150 - 250)', 
+                                'Riesgo muy alto (\u2265 250)'))
+    }
     
-    labels <- sprintf("<b, font-size = 28px> %s </b></br> Nº casos: %s </br> IA: %s </br> Porcentaje PDIA positivas: %s 
-                  </br> Porcentaje PDIA positivas regional: %s", 
+    
+    pal <- colorFactor(palette = c("#FFFFB2", "#FECC5C", "#FD8D3C", "#F03B20", "#BD0026"), domain = mapzb$ia_cat, 
+                       na.color = "#800026")
+    
+    # pal <- colorNumeric(palette = "YlOrRd", domain = mapzb$ia)
+    
+    labels <- sprintf("<b, font-size = 28px> %s </b></br> Nº casos: %s </br> IA: %s </br> %% PDIA positivas: %s 
+                  </br> %% PDIA positivas regional: %s", 
                       mapzb$zonabasica, 
                       mapzb$ncasos, 
-                      format(mapzb$ia, digits = 3, nsmall = 2), 
+                      paste(format(mapzb$ia, digits = 3, nsmall = 2), mapzb$ia_cat, sep = '  '), 
                       format(mapzb$porc_positivos, digits = 2, nsmall = 1), 
                       format(mapzb$porc_regional, digits = 2, nsmall = 1 )) %>% 
       lapply(htmltools::HTML)
     
     l <- leaflet(mapzb)
-    l %>% addPolygons(color = "gray", weight = 1, fillColor = ~ pal(ia), fillOpacity = 1,
+    l %>% addPolygons(color = "gray", weight = 1, fillColor = ~ pal(ia_cat), fillOpacity = 1,
                       highlightOptions = highlightOptions(color = "white",weight = 1, bringToFront = TRUE),
                       label = labels,
                       labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "2px 6px"),
@@ -603,11 +750,10 @@ server <- function(input, output, session) {
                                                   direction = "auto",
                                                   opacity = 0.7)) %>%
       addLegend(pal = pal, 
-                values = ~ ia, 
+                values = ~ dominio, 
                 opacity = 0.5, 
                 title = HTML(paste0("<b style = font-size:14px>", paste0("IA ", input$periodo6, " días previos"), "</b>")), 
                 position = "topright",
-                bins = 10,
                 labFormat = labelFormat(digits = 2)) 
   })
   
@@ -642,19 +788,55 @@ server <- function(input, output, session) {
   output$mapzbmun <- renderLeaflet({
     mapzb <- covidmapazbmun()
     
-    pal <- colorNumeric(palette = "YlOrRd", domain = mapzb$ia)
+    if (input$periodo7 == '14 días'){
+      puntos <-  c(-Inf, 50, 100, 300, 500, Inf)
+      mapzb$ia_cat <- cut(mapzb$ia, breaks = puntos, 
+                          include.lowest = TRUE, right = FALSE, 
+                          labels = c('Bajo control (\u2264 50)', 
+                                     'Riesgo bajo [50 - 100)', 
+                                     'Riesgo moderado [100 - 300)', 
+                                     'Riesgo alto [300 - 500)', 
+                                     'Riesgo muy alto (\u2265 500)'))
+      dominio <- cut(0:550, breaks = puntos, 
+                     include.lowest = TRUE, right = FALSE, 
+                     labels = c('Bajo control (\u2264 50)', 
+                                'Riesgo bajo [50 - 100)', 
+                                'Riesgo moderado [100 - 300)', 
+                                'Riesgo alto [300 - 500)', 
+                                'Riesgo muy alto (\u2265 500)'))
+    }else{
+      puntos <-  c(-Inf, 25, 50, 150, 250, Inf)
+      mapzb$ia_cat <- cut(mapzb$ia, breaks = puntos, 
+                          include.lowest = TRUE, right = FALSE, 
+                          labels = c('Bajo control (\u2264 25)', 
+                                     'Riesgo bajo [25 - 50)', 
+                                     'Riesgo moderado [50 - 150)', 
+                                     'Riesgo alto [150 - 250)', 
+                                     'Riesgo muy alto (\u2265 250)'))
+      dominio <- cut(0:275, breaks = puntos, 
+                     include.lowest = TRUE, right = FALSE, 
+                     labels = c('Bajo control (\u2264 25)', 
+                                'Riesgo bajo [25 - 50)', 
+                                'Riesgo moderado [50 - 150)', 
+                                'Riesgo alto [150 - 250)', 
+                                'Riesgo muy alto (\u2265 250)'))
+    }
     
-    labels <- sprintf("<b, font-size = 28px> %s </b></br> Nº casos: %s </br> IA: %s </br> Porcentaje PDIA positivas: %s 
-                  </br> Porcentaje PDIA positivas regional: %s", 
+    
+    pal <- colorFactor(palette = c("#FFFFB2", "#FECC5C", "#FD8D3C", "#F03B20", "#BD0026"), domain = mapzb$ia_cat, 
+                       na.color = "#800026")
+    
+    labels <- sprintf("<b, font-size = 28px> %s </b></br> Nº casos: %s </br> IA: %s </br> %% PDIA positivas: %s 
+                  </br> %% PDIA positivas regional: %s", 
                       mapzb$zonabasica, 
                       mapzb$ncasos, 
-                      format(mapzb$ia, digits = 3, nsmall = 2), 
+                      paste(format(mapzb$ia, digits = 3, nsmall = 2), mapzb$ia_cat, sep = '  '), 
                       format(mapzb$porc_positivos, digits = 2, nsmall = 1), 
                       format(mapzb$porc_regional, digits = 2, nsmall = 1 )) %>% 
       lapply(htmltools::HTML)
     
     l <- leaflet(mapzb)
-    l %>% addPolygons(color = "gray", weight = 1, fillColor = ~ pal(ia), fillOpacity = 1,
+    l %>% addPolygons(color = "gray", weight = 1, fillColor = ~ pal(ia_cat), fillOpacity = 1,
                       highlightOptions = highlightOptions(color = "white",weight = 1, bringToFront = TRUE),
                       label = labels,
                       labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "2px 6px"),
@@ -662,11 +844,10 @@ server <- function(input, output, session) {
                                                   direction = "auto",
                                                   opacity = 0.7)) %>%
       addLegend(pal = pal, 
-                values = ~ ia, 
+                values = ~ dominio, 
                 opacity = 0.5, 
                 title = HTML(paste0("<b style = font-size:14px>", paste0("IA ", input$periodo7, " días previos"), "</b>")), 
                 position = "topright",
-                bins = 10,
                 labFormat = labelFormat(digits = 2))  
   })
   
@@ -683,6 +864,8 @@ server <- function(input, output, session) {
     switch (input$ventana3,
             'Desde 01/07/2020' = df <- df_m %>% 
               filter(codmunicipio == '1205' & periodo == input$periodo8), 
+            'Desde 20/06/2021' = df <- df_m %>% 
+              filter(fecha >= '2021-06-20' & codmunicipio == '1205' & periodo == input$periodo8),
             'Últimos 120 días' = df <- df_m %>%
               filter(fecha >= fecha_actual - 120 & codmunicipio == '1205' & periodo == input$periodo8),
             'Últimos 60 días' = df <- df_m %>%
@@ -732,7 +915,7 @@ server <- function(input, output, session) {
                xaxis = list(title = ""), 
                yaxis = list(title = axis_y_title, 
                             range = c(0, max(df$ia) + 0.10 * max(df$ia))), 
-               hovermode = 'x')
+               hovermode = 'compare')
       p <- config(p, locale = 'es')
       p <- p %>% 
         layout(annotations = list(text = 'Servicio de Epidemiologia. D.G. Salud Pública y Adicciones. Consejería de Salud.',
@@ -781,7 +964,7 @@ server <- function(input, output, session) {
                xaxis = list(title = ""), 
                yaxis = list(title = axis_y_title, 
                             range = c(0, max(df$ia) + 0.10 * max(df$ia))), 
-               hovermode = 'x')
+               hovermode = 'compare')
       p <- config(p, locale = 'es')
       p <- p %>% 
         layout(annotations = list(text = 'Servicio de Epidemiologia. D.G. Salud Pública y Adicciones. Consejería de Salud.',
